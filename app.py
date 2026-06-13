@@ -140,4 +140,42 @@ def convert_pdf_to_word():
         return jsonify({"error": f"Erro fatal na conversão: {str(fatal_err)}"}), 500
 
 # ==========================================
-# ROTA 3: PDF para TXT (Texto Limpo
+# ROTA 3: PDF para TXT (Texto Limpo)
+# ==========================================
+@app.route('/convert/txt', methods=['POST'])
+def convert_pdf_to_txt():
+    if 'file' not in request.files:
+        return "Nenhum arquivo enviado", 400
+        
+    pdf_file = request.files['file']
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+        pdf_file.save(temp_pdf.name)
+        pdf_path = temp_pdf.name
+
+    txt_path = pdf_path.replace('.pdf', '.txt')
+    
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    doc.close()
+    
+    with open(txt_path, "w", encoding="utf-8") as text_file:
+        text_file.write(text)
+        
+    return send_file(txt_path, as_attachment=True, download_name="convertido.txt", mimetype='text/plain')
+
+# ==========================================
+# ROTA EXTRA: Para o Render entregar o arquivo (Usado pela Rota 2)
+# ==========================================
+@app.route('/download/<filename>', methods=['GET'])
+def download_local_file(filename):
+    file_path = f"/tmp/{filename}"
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True, download_name="VertoryHub_Convertido.docx")
+    return jsonify({"error": "Arquivo expirou ou não existe"}), 404
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
