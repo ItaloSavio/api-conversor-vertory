@@ -4,3 +4,4 @@ PyMuPDF
 EbookLib
 pdf2docx
 gunicorn
+cloudconvert
