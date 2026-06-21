@@ -7,6 +7,7 @@ import tempfile
 import cloudconvert
 import pdfplumber
 import pandas as pd
+import google.generativeai as genai
 
 app = Flask(__name__)
 CORS(app)
