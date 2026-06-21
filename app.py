@@ -246,15 +246,6 @@ def convert_pdf_to_excel():
 
 
 
-
-
-# ==========================================
-# CONFIGURAÇÃO DA IA (GEMINI)
-# ==========================================
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
 # ==========================================
 # ROTA 5: Extrair texto silenciosamente para o Chat
 # ==========================================
@@ -288,8 +279,13 @@ def chat_extract_text():
 # ==========================================
 @app.route('/chat/ask', methods=['POST'])
 def chat_ask_question():
-    if not GEMINI_API_KEY:
+    # 1. Lê a chave diretamente do servidor na hora da requisição
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
          return jsonify({"error": "API Key da IA não configurada no servidor"}), 500
+         
+    # 2. Configura a IA com a chave lida
+    genai.configure(api_key=api_key)
          
     data = request.get_json()
     if not data or 'context' not in data or 'question' not in data:
@@ -299,10 +295,7 @@ def chat_ask_question():
     pergunta = data['question']
     
     try:
-        # Chama o motor ultrarrápido do Google
         model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # Constrói a regra de como a IA deve se comportar
         prompt = f"""
         Você é um assistente inteligente do sistema VertoryHub. 
         Sua missão é responder à pergunta do usuário baseando-se ÚNICA E EXCLUSIVAMENTE no documento fornecido abaixo.
