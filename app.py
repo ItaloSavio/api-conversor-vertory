@@ -295,7 +295,7 @@ def chat_ask_question():
     pergunta = data['question']
     
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         prompt = f"""
         Você é um assistente inteligente do sistema VertoryHub. 
         Sua missão é responder à pergunta do usuário baseando-se ÚNICA E EXCLUSIVAMENTE no documento fornecido abaixo.
