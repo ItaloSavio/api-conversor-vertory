@@ -5,3 +5,6 @@ EbookLib
 pdf2docx
 gunicorn
 cloudconvert
+pdfplumber
+pandas
+openpyxl
