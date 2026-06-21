@@ -5,6 +5,8 @@ from ebooklib import epub
 import os
 import tempfile
 import cloudconvert
+import pdfplumber
+import pandas as pd
 
 app = Flask(__name__)
 CORS(app)
@@ -179,3 +181,62 @@ def download_local_file(filename):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
+
+
+
+# ==========================================
+# ROTA 4: Extração de Tabelas (PDF para EXCEL)
+# ==========================================
+@app.route('/convert/excel', methods=['POST'])
+def convert_pdf_to_excel():
+    if 'file' not in request.files:
+        return jsonify({"error": "Nenhum arquivo enviado"}), 400
+        
+    file = request.files['file']
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+        file.save(temp_pdf.name)
+        temp_path = temp_pdf.name
+
+    excel_filename = f"tabelas_extraidas_{os.path.basename(temp_path)}.xlsx"
+    excel_path = f"/tmp/{excel_filename}"
+    
+    todas_tabelas = []
+    
+    try:
+        # Abre o PDF com o pdfplumber para escanear as grades
+        with pdfplumber.open(temp_path) as pdf:
+            for page in pdf.pages:
+                # O extract_tables() procura formatos de grade e linhas visíveis/invisíveis
+                tabelas_na_pagina = page.extract_tables()
+                
+                for tabela in tabelas_na_pagina:
+                    # Limpa a sujeira (remove linhas completamente vazias)
+                    tabela_limpa = [linha for linha in tabela if any(celula is not None and str(celula).strip() != '' for celula in linha)]
+                    
+                    if tabela_limpa:
+                        # Converte a lista em um DataFrame do Pandas
+                        df = pd.DataFrame(tabela_limpa)
+                        todas_tabelas.append(df)
+        
+        # Se o robô escaneou o PDF inteiro e não achou o formato de uma tabela
+        if not todas_tabelas:
+            os.remove(temp_path)
+            return jsonify({"error": "Nenhuma estrutura de tabela foi encontrada neste PDF."}), 404
+            
+        # Salva todas as tabelas encontradas no Excel (Cada tabela vira uma "Aba" na planilha)
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+            for i, df in enumerate(todas_tabelas):
+                df.to_excel(writer, sheet_name=f'Tabela_{i+1}', index=False, header=False)
+                
+        # Limpa o PDF do servidor
+        os.remove(temp_path)
+        
+        # Envia a planilha direto para o usuário
+        return send_file(excel_path, as_attachment=True, download_name="VertoryHub_Tabelas.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return jsonify({"error": f"Erro fatal na extração: {str(e)}"}), 500
+        
