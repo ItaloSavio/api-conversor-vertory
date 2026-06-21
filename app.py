@@ -241,3 +241,82 @@ def convert_pdf_to_excel():
             os.remove(temp_path)
         return jsonify({"error": f"Erro fatal na extração: {str(e)}"}), 500
         
+
+
+
+
+
+
+
+# ==========================================
+# CONFIGURAÇÃO DA IA (GEMINI)
+# ==========================================
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+# ==========================================
+# ROTA 5: Extrair texto silenciosamente para o Chat
+# ==========================================
+@app.route('/chat/extract', methods=['POST'])
+def chat_extract_text():
+    if 'file' not in request.files:
+        return jsonify({"error": "Nenhum arquivo enviado"}), 400
+        
+    file = request.files['file']
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+        file.save(temp_pdf.name)
+        temp_path = temp_pdf.name
+        
+    try:
+        doc = fitz.open(temp_path)
+        text = ""
+        for page in doc:
+            text += page.get_text()
+        doc.close()
+        
+        os.remove(temp_path) # Apaga o PDF do servidor imediatamente
+        return jsonify({"success": True, "text": text}), 200
+        
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return jsonify({"error": f"Erro ao extrair texto: {str(e)}"}), 500
+
+# ==========================================
+# ROTA 6: Fazer a pergunta para a IA
+# ==========================================
+@app.route('/chat/ask', methods=['POST'])
+def chat_ask_question():
+    if not GEMINI_API_KEY:
+         return jsonify({"error": "API Key da IA não configurada no servidor"}), 500
+         
+    data = request.get_json()
+    if not data or 'context' not in data or 'question' not in data:
+        return jsonify({"error": "Faltando o contexto do documento ou a pergunta"}), 400
+        
+    contexto = data['context']
+    pergunta = data['question']
+    
+    try:
+        # Chama o motor ultrarrápido do Google
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Constrói a regra de como a IA deve se comportar
+        prompt = f"""
+        Você é um assistente inteligente do sistema VertoryHub. 
+        Sua missão é responder à pergunta do usuário baseando-se ÚNICA E EXCLUSIVAMENTE no documento fornecido abaixo.
+        Se a resposta não estiver no documento, diga que não encontrou a informação.
+        
+        DOCUMENTO:
+        {contexto}
+        
+        PERGUNTA DO USUÁRIO:
+        {pergunta}
+        """
+        
+        resposta = model.generate_content(prompt)
+        return jsonify({"success": True, "answer": resposta.text}), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Erro na comunicação com a IA: {str(e)}"}), 500
