@@ -8,3 +8,4 @@ cloudconvert
 pdfplumber
 pandas
 openpyxl
+google-generativeai
